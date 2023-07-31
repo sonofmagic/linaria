@@ -1,0 +1,8 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`dynamic-import-noop case 0 1`] = `
+"({
+  then: () => undefined,
+  catch: () => undefined
+});"
+`;

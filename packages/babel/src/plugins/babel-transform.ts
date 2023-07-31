@@ -45,7 +45,7 @@ export default function collector(
           inputSourceMap: file.opts.inputSourceMap ?? undefined,
         }
       );
-
+      // 提取表达式和变量，生成 class name
       if (
         !prepareStageResult ||
         !withLinariaMetadata(prepareStageResult?.metadata)

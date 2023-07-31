@@ -3,6 +3,9 @@
   "compilerOptions": {
     "paths": {},
     "rootDir": "src/",
-    "types": ["node"]
+    "types": [
+      "node",
+      "jest"
+    ]
   }
 }

@@ -68,7 +68,7 @@ function runPreevalStage(
     babelOptions.plugins?.filter((i) =>
       hasKeyInList(i, pluginOptions.highPriorityPlugins)
     ) ?? [];
-
+  // 所以这里才是 preeval 的核心
   const plugins = [
     ...preShakePlugins,
     [require.resolve('../plugins/preeval'), { ...pluginOptions, eventEmitter }],

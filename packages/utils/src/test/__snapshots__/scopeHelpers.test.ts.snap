@@ -1,0 +1,41 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`scopeHelpers removeWithRelated case 0 1`] = `
+"Object.defineProperty(exports, \\"__esModule\\", {
+  value: true
+});
+const header = \\"hnscg4s\\";"
+`;
+
+exports[`scopeHelpers removeWithRelated case 1 1`] = `
+"Object.defineProperty(exports, \\"__esModule\\", {
+  value: true
+});
+exports.__linariaPreval = void 0;
+const header = \\"hnscg4s\\";"
+`;
+
+exports[`scopeHelpers removeWithRelated case 2 1`] = `
+"Object.defineProperty(exports, \\"__esModule\\", {
+  value: true
+});
+var _polished = require(\\"polished\\");
+const _exp = /*#__PURE__*/() => (0, _polished.modularScale)(2);
+const _exp2 = /*#__PURE__*/() => (0, _polished.hiDPI)(1.5);
+const _exp3 = /*#__PURE__*/() => (0, _polished.modularScale)(2.5);
+const header = \\"hnscg4s\\";
+const __linariaPreval = {
+  _exp: _exp,
+  _exp2: _exp2,
+  _exp3: _exp3
+};
+exports.__linariaPreval = __linariaPreval;"
+`;
+
+exports[`scopeHelpers removeWithRelated case 3 1`] = `
+"Object.defineProperty(exports, \\"__esModule\\", {
+  value: true
+});
+exports.__linariaPreval = void 0;
+const header = \\"hnscg4s\\";"
+`;

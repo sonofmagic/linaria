@@ -28,7 +28,7 @@ type Options = {
   vars?: {
     [key: string]: [
       string | number | ((props: unknown) => string | number),
-      string | void
+      string | void,
     ];
   };
 };
@@ -100,9 +100,9 @@ const warnIfInvalid = (value: unknown, componentName: string) => {
 };
 
 interface IProps {
+  [props: string]: unknown;
   className?: string;
   style?: Record<string, string>;
-  [props: string]: unknown;
 }
 
 let idx = 0;
@@ -115,7 +115,7 @@ function styled(
 function styled<
   TProps extends Has<TMustHave, { style?: React.CSSProperties }>,
   TMustHave extends { style?: React.CSSProperties },
-  TConstructor extends Component<TProps>
+  TConstructor extends Component<TProps>,
 >(
   componentWithStyle: TConstructor & Component<TProps>
 ): ComponentStyledTagWithInterpolation<TProps, TConstructor>;
@@ -123,7 +123,7 @@ function styled<
 function styled<
   TProps extends Has<TMustHave, { className?: string }>,
   TMustHave extends { className?: string },
-  TConstructor extends Component<TProps>
+  TConstructor extends Component<TProps>,
 >(
   componentWithoutStyle: TConstructor & Component<TProps>
 ): ComponentStyledTagWithoutInterpolation<TConstructor>;
@@ -139,7 +139,7 @@ function styled(tag: any): any {
   if (process.env.NODE_ENV === 'test') {
     // eslint-disable-next-line no-plusplus
     mockedClass += `mocked-styled-${idx++}`;
-    if (tag?.__linaria?.className) {
+    if (tag && tag.__linaria && tag.__linaria.className) {
       mockedClass += ` ${tag.__linaria.className}`;
     }
   }
@@ -244,7 +244,7 @@ export type StyledComponent<T> = StyledMeta &
 type StaticPlaceholder = string | number | CSSProperties | StyledMeta;
 
 export type HtmlStyledTag<TName extends keyof JSX.IntrinsicElements> = <
-  TAdditionalProps = Record<never, unknown>
+  TAdditionalProps = Record<never, unknown>,
 >(
   strings: TemplateStringsArray,
   ...exprs: Array<

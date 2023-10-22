@@ -7,209 +7,185 @@
  * - return transformed code (without Linaria template literals), generated CSS, source maps and babel metadata from transform step.
  */
 
-import type { TransformOptions } from '@babel/core';
-import * as babel from '@babel/core';
-
-import { EventEmitter } from '@linaria/utils';
-import type { StrictOptions } from '@linaria/utils';
+import { isFeatureEnabled } from '@linaria/utils';
 
 import { TransformCacheCollection } from './cache';
-import prepareForEval, {
-  prepareForEvalSync,
-} from './transform-stages/1-prepare-for-eval';
-import evalStage from './transform-stages/2-eval';
-import prepareForRuntime from './transform-stages/3-prepare-for-runtime';
-import extractStage from './transform-stages/4-extract';
-import loadLinariaOptions from './transform-stages/helpers/loadLinariaOptions';
-import type { Options, Result, ITransformFileResult } from './types';
-import withLinariaMetadata from './utils/withLinariaMetadata';
+import { Entrypoint } from './transform/Entrypoint';
+import {
+  asyncActionRunner,
+  syncActionRunner,
+} from './transform/actions/actionRunner';
+import { baseHandlers } from './transform/generators';
+import {
+  asyncResolveImports,
+  syncResolveImports,
+} from './transform/generators/resolveImports';
+import type { PartialOptions } from './transform/helpers/loadLinariaOptions';
+import loadLinariaOptions from './transform/helpers/loadLinariaOptions';
+import { withDefaultServices } from './transform/helpers/withDefaultServices';
+import type {
+  Handlers,
+  IResolveImportsAction,
+  Services,
+} from './transform/types';
+import type { Result } from './types';
 
-function syncStages(
-  originalCode: string,
-  pluginOptions: StrictOptions,
-  options: Pick<
-    Options,
-    'filename' | 'inputSourceMap' | 'root' | 'preprocessor' | 'outputFilename'
-  >,
-  prepareStageResult: ITransformFileResult | undefined,
-  babelConfig: TransformOptions,
-  cache: TransformCacheCollection,
-  eventEmitter = EventEmitter.dummy
-) {
-  const { filename } = options;
-  const ast = cache.get('originalAST', filename) ?? 'ignored';
-
-  // File is ignored or does not contain any tags. Return original code.
-  if (
-    ast === 'ignored' ||
-    !prepareStageResult ||
-    !withLinariaMetadata(prepareStageResult.metadata)
-  ) {
-    return {
-      code: originalCode,
-      sourceMap: options.inputSourceMap,
-    };
-  }
-
-  // *** 2nd stage ***
-
-  const finishStage2Event = eventEmitter.pair({ stage: 'stage-2', filename });
-
-  const evalStageResult = evalStage(
-    cache,
-    prepareStageResult.code,
-    pluginOptions,
-    filename
-  );
-
-  finishStage2Event();
-
-  if (evalStageResult === null) {
-    return {
-      code: originalCode,
-      sourceMap: options.inputSourceMap,
-    };
-  }
-
-  const [valueCache, dependencies] = evalStageResult;
-
-  // *** 3rd stage ***
-
-  const finishStage3Event = eventEmitter.pair({ stage: 'stage-3', filename });
-
-  const collectStageResult = prepareForRuntime(
-    babel,
-    ast,
-    originalCode,
-    valueCache,
-    pluginOptions,
-    options,
-    babelConfig
-  );
-
-  finishStage3Event();
-
-  if (!withLinariaMetadata(collectStageResult.metadata)) {
-    return {
-      code: collectStageResult.code!,
-      sourceMap: collectStageResult.map,
-    };
-  }
-
-  // *** 4th stage
-
-  const finishStage4Event = eventEmitter.pair({ stage: 'stage-4', filename });
-
-  const extractStageResult = extractStage(
-    collectStageResult.metadata.linaria.processors,
-    originalCode,
-    options
-  );
-
-  finishStage4Event();
-
-  return {
-    ...extractStageResult,
-    code: collectStageResult.code ?? '',
-    dependencies,
-    replacements: [
-      ...extractStageResult.replacements,
-      ...collectStageResult.metadata.linaria.replacements,
-    ],
-    sourceMap: collectStageResult.map,
+type PartialServices = Partial<Omit<Services, 'options'>> & {
+  options: Omit<Services['options'], 'pluginOptions'> & {
+    pluginOptions?: PartialOptions;
   };
-}
+};
+
+type AllHandlers<TMode extends 'async' | 'sync'> = Handlers<TMode>;
 
 export function transformSync(
+  partialServices: PartialServices,
   originalCode: string,
-  options: Options,
   syncResolve: (what: string, importer: string, stack: string[]) => string,
-  babelConfig: TransformOptions = {},
-  cache = new TransformCacheCollection(),
-  eventEmitter = EventEmitter.dummy
+  customHandlers: Partial<AllHandlers<'sync'>> = {}
 ): Result {
-  const { filename } = options;
-  // *** 1st stage ***
-
-  const finishEvent = eventEmitter.pair({ stage: 'stage-1', filename });
-
-  const entrypoint = {
-    name: options.filename,
-    code: originalCode,
-    only: ['__linariaPreval'],
-  };
-
+  const { options } = partialServices;
   const pluginOptions = loadLinariaOptions(options.pluginOptions);
-  const prepareStageResults = prepareForEvalSync(
-    babel,
-    cache,
-    syncResolve,
-    entrypoint,
-    pluginOptions,
-    options
+  const services = withDefaultServices({
+    ...partialServices,
+    options: {
+      ...options,
+      pluginOptions,
+    },
+  });
+
+  if (
+    !isFeatureEnabled(pluginOptions.features, 'globalCache', options.filename)
+  ) {
+    // If global cache is disabled, we need to create a new cache for each file
+    services.cache = new TransformCacheCollection();
+  }
+
+  const entrypoint = Entrypoint.createRoot(
+    services,
+    options.filename,
+    ['__linariaPreval'],
+    originalCode
   );
 
-  finishEvent();
+  if (entrypoint.ignored) {
+    return {
+      code: originalCode,
+      sourceMap: options.inputSourceMap,
+    };
+  }
 
-  // *** The rest of the stages are synchronous ***
+  const workflowAction = entrypoint.createAction('workflow', undefined);
 
-  return syncStages(
-    originalCode,
-    pluginOptions,
-    options,
-    prepareStageResults,
-    babelConfig,
-    cache,
-    eventEmitter
-  );
+  try {
+    const result = syncActionRunner(workflowAction, {
+      ...baseHandlers,
+      ...customHandlers,
+      resolveImports() {
+        return syncResolveImports.call(this, syncResolve);
+      },
+    });
+
+    entrypoint.log('%s is ready', entrypoint.name);
+
+    return result;
+  } catch (err) {
+    entrypoint.log('Unhandled error %O', err);
+
+    if (
+      isFeatureEnabled(pluginOptions.features, 'softErrors', options.filename)
+    ) {
+      // eslint-disable-next-line no-console
+      console.error(`Error during transform of ${entrypoint.name}:`, err);
+
+      return {
+        code: originalCode,
+        sourceMap: options.inputSourceMap,
+      };
+    }
+
+    throw err;
+  }
 }
 
 export default async function transform(
+  partialServices: PartialServices,
   originalCode: string,
-  options: Options,
   asyncResolve: (
     what: string,
     importer: string,
     stack: string[]
   ) => Promise<string | null>,
-  babelConfig: TransformOptions = {},
-  cache = new TransformCacheCollection(),
-  eventEmitter = EventEmitter.dummy
+  customHandlers: Partial<AllHandlers<'sync'>> = {}
 ): Promise<Result> {
-  const { filename } = options;
-
-  // *** 1st stage ***
-
-  const finishEvent = eventEmitter.pair({ stage: 'stage-1', filename });
-
-  const entrypoint = {
-    name: filename,
-    code: originalCode,
-    only: ['__linariaPreval'],
-  };
-
+  const { options } = partialServices;
   const pluginOptions = loadLinariaOptions(options.pluginOptions);
-  const prepareStageResults = await prepareForEval(
-    babel,
-    cache,
-    asyncResolve,
-    entrypoint,
-    pluginOptions,
-    options,
-    eventEmitter
+  const services = withDefaultServices({
+    ...partialServices,
+    options: {
+      ...options,
+      pluginOptions,
+    },
+  });
+
+  if (
+    !isFeatureEnabled(pluginOptions.features, 'globalCache', options.filename)
+  ) {
+    // If global cache is disabled, we need to create a new cache for each file
+    services.cache = new TransformCacheCollection();
+  }
+
+  /*
+   * This method can be run simultaneously for multiple files.
+   * A shared cache is accessible for all runs, but each run has its own queue
+   * to maintain the correct processing order. The cache stores the outcome
+   * of tree-shaking, and if the result is already stored in the cache
+   * but the "only" option has changed, the file will be re-processed using
+   * the combined "only" option.
+   */
+  const entrypoint = Entrypoint.createRoot(
+    services,
+    options.filename,
+    ['__linariaPreval'],
+    originalCode
   );
 
-  finishEvent();
+  if (entrypoint.ignored) {
+    return {
+      code: originalCode,
+      sourceMap: options.inputSourceMap,
+    };
+  }
 
-  // *** The rest of the stages are synchronous ***
+  const workflowAction = entrypoint.createAction('workflow', undefined);
 
-  return syncStages(
-    originalCode,
-    pluginOptions,
-    options,
-    prepareStageResults,
-    babelConfig,
-    cache,
-    eventEmitter
-  );
+  try {
+    const result = await asyncActionRunner(workflowAction, {
+      ...baseHandlers,
+      ...customHandlers,
+      resolveImports(this: IResolveImportsAction) {
+        return asyncResolveImports.call(this, asyncResolve);
+      },
+    });
+
+    entrypoint.log('%s is ready', entrypoint.name);
+
+    return result;
+  } catch (err) {
+    entrypoint.log('Unhandled error %O', err);
+
+    if (
+      isFeatureEnabled(pluginOptions.features, 'softErrors', options.filename)
+    ) {
+      // eslint-disable-next-line no-console
+      console.error(`Error during transform of ${entrypoint.name}:`, err);
+
+      return {
+        code: originalCode,
+        sourceMap: options.inputSourceMap,
+      };
+    }
+
+    throw err;
+  }
 }

@@ -1,3 +1,5 @@
+import type { Context as VmContext } from 'vm';
+
 import type { TransformOptions } from '@babel/core';
 import type { File } from '@babel/types';
 
@@ -28,7 +30,7 @@ export type EvaluatorConfig = {
 };
 
 export type Evaluator = (
-  babelOptions: TransformOptions,
+  evalConfig: TransformOptions,
   ast: File,
   code: string,
   config: EvaluatorConfig,
@@ -37,7 +39,7 @@ export type Evaluator = (
   ast: File,
   code: string,
   imports: Map<string, string[]> | null,
-  exports?: string[] | null
+  exports?: string[] | null,
 ];
 
 export type EvalRule = {
@@ -48,19 +50,31 @@ export type EvalRule = {
 
 export type FeatureFlag = boolean | string | string[];
 
-export type FeatureFlags = {
+type AllFeatureFlags = {
   dangerousCodeRemover: FeatureFlag;
+  globalCache: FeatureFlag;
+  happyDOM: FeatureFlag;
+  softErrors: FeatureFlag;
+  useBabelConfigs: FeatureFlag;
 };
+
+export type FeatureFlags<
+  TOnly extends keyof AllFeatureFlags = keyof AllFeatureFlags,
+> = Pick<AllFeatureFlags, TOnly>;
 
 export type StrictOptions = {
   babelOptions: TransformOptions;
-  highPriorityPlugins: string[];
   classNameSlug?: string | ClassNameFn;
   displayName: boolean;
   evaluate: boolean;
   extensions: string[];
   features: FeatureFlags;
+  highPriorityPlugins: string[];
   ignore?: RegExp;
+  overrideContext?: (
+    context: Partial<VmContext>,
+    filename: string
+  ) => Partial<VmContext>;
   rules: EvalRule[];
   tagResolver?: (source: string, tag: string) => string | null;
   variableNameConfig?: 'var' | 'dashes' | 'raw';

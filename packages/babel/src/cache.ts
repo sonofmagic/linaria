@@ -1,50 +1,26 @@
 import { createHash } from 'crypto';
 
-import type { File } from '@babel/types';
-
 import { linariaLogger } from '@linaria/logger';
+import { getFileIdx } from '@linaria/utils';
 
-import type { IModule } from './module';
-import type { ITransformFileResult } from './types';
+import type { Entrypoint } from './transform/Entrypoint';
+import type { IEvaluatedEntrypoint } from './transform/EvaluatedEntrypoint';
 
 function hashContent(content: string) {
   return createHash('sha256').update(content).digest('hex');
 }
 
 interface ICaches {
-  resolve: Map<string, string>;
-  resolveTask: Map<
-    string,
-    Promise<{
-      importedFile: string;
-      importsOnly: string[];
-      resolved: string | null;
-    }>
-  >;
-  code: Map<
-    string,
-    {
-      imports: Map<string, string[]> | null;
-      only: string[];
-      result: ITransformFileResult;
-    }
-  >;
-  eval: Map<string, IModule>;
-  originalAST: Map<string, File>;
+  entrypoints: Map<string, Entrypoint | IEvaluatedEntrypoint>;
+  exports: Map<string, string[]>;
 }
 
 type MapValue<T> = T extends Map<string, infer V> ? V : never;
 
 const cacheLogger = linariaLogger.extend('cache');
 
-const cacheNames = [
-  'resolve',
-  'resolveTask',
-  'code',
-  'eval',
-  'originalAST',
-] as const;
-type CacheNames = typeof cacheNames[number];
+const cacheNames = ['entrypoints', 'exports'] as const;
+type CacheNames = (typeof cacheNames)[number];
 
 const loggers = cacheNames.reduce(
   (acc, key) => ({
@@ -55,69 +31,60 @@ const loggers = cacheNames.reduce(
 );
 
 export class TransformCacheCollection {
+  public readonly entrypoints: Map<string, Entrypoint | IEvaluatedEntrypoint>;
+
+  public readonly exports: Map<string, string[]>;
+
   private contentHashes = new Map<string, string>();
 
-  protected readonly resolve: Map<string, string>;
-
-  protected readonly resolveTask: Map<string, Promise<string>>;
-
-  protected readonly code: Map<
-    string,
-    {
-      imports: Map<string, string[]> | null;
-      only: string[];
-      result: ITransformFileResult;
-    }
-  >;
-
-  protected readonly eval: Map<string, IModule>;
-
-  protected readonly originalAST: Map<string, File>;
-
   constructor(caches: Partial<ICaches> = {}) {
-    this.resolve = caches.resolve || new Map();
-    this.resolveTask = caches.resolveTask || new Map();
-    this.code = caches.code || new Map();
-    this.eval = caches.eval || new Map();
-    this.originalAST = caches.originalAST || new Map();
-  }
-
-  public invalidateForFile(filename: string) {
-    cacheNames.forEach((cacheName) => {
-      this.invalidate(cacheName, filename);
-    });
-  }
-
-  public invalidateIfChanged(filename: string, content: string) {
-    const hash = this.contentHashes.get(filename);
-    const newHash = hashContent(content);
-
-    if (hash !== newHash) {
-      cacheLogger('content has changed, invalidate all for %s', filename);
-      this.contentHashes.set(filename, newHash);
-      this.invalidateForFile(filename);
-    }
+    this.entrypoints = caches.entrypoints || new Map();
+    this.exports = caches.exports || new Map();
   }
 
   public add<
     TCache extends CacheNames,
-    TValue extends MapValue<ICaches[TCache]>
+    TValue extends MapValue<ICaches[TCache]>,
   >(cacheName: TCache, key: string, value: TValue): void {
     const cache = this[cacheName] as Map<string, TValue>;
-    loggers[cacheName]('add %s %f', key, () => {
-      if (!cache.has(key)) {
-        return 'added';
-      }
+    loggers[cacheName](
+      '%s:add %s %f',
+      getFileIdx(key).toString().padStart(5, '0'),
+      key,
+      () => {
+        if (!cache.has(key)) {
+          return 'added';
+        }
 
-      return cache.get(key) === value ? 'unchanged' : 'updated';
-    });
+        return cache.get(key) === value ? 'unchanged' : 'updated';
+      }
+    );
 
     cache.set(key, value);
   }
 
+  public clear(cacheName: CacheNames | 'all'): void {
+    if (cacheName === 'all') {
+      cacheNames.forEach((name) => {
+        this.clear(name);
+      });
+
+      return;
+    }
+
+    loggers[cacheName]('clear');
+    const cache = this[cacheName] as Map<string, unknown>;
+
+    cache.clear();
+  }
+
+  public delete(cacheName: CacheNames, key: string): void {
+    this.invalidate(cacheName, key);
+  }
+
   public get<
     TCache extends CacheNames,
-    TValue extends MapValue<ICaches[TCache]>
+    TValue extends MapValue<ICaches[TCache]>,
   >(cacheName: TCache, key: string): TValue | undefined {
     const cache = this[cacheName] as Map<string, TValue>;
 
@@ -135,16 +102,34 @@ export class TransformCacheCollection {
   }
 
   public invalidate(cacheName: CacheNames, key: string): void {
-    loggers[cacheName]('invalidate', key);
     const cache = this[cacheName] as Map<string, unknown>;
+    if (!cache.has(key)) {
+      return;
+    }
+
+    loggers[cacheName]('invalidate', key);
 
     cache.delete(key);
   }
 
-  public clear(cacheName: CacheNames): void {
-    loggers[cacheName]('clear');
-    const cache = this[cacheName] as Map<string, unknown>;
+  public invalidateForFile(filename: string) {
+    cacheNames.forEach((cacheName) => {
+      this.invalidate(cacheName, filename);
+    });
+  }
 
-    cache.clear();
+  public invalidateIfChanged(filename: string, content: string) {
+    const hash = this.contentHashes.get(filename);
+    const newHash = hashContent(content);
+
+    if (hash !== newHash) {
+      cacheLogger('content has changed, invalidate all for %s', filename);
+      this.contentHashes.set(filename, newHash);
+      this.invalidateForFile(filename);
+
+      return true;
+    }
+
+    return false;
   }
 }

@@ -1,5 +1,93 @@
 # Change Log
 
+## 5.0.4
+
+### Patch Changes
+
+- Updated dependencies [4b083b7c]
+  - @linaria/react@5.0.3
+
+## 5.0.3
+
+### Patch Changes
+
+- 5f216d3b: Fix for lost `pluginOptions` in some entrypoints.
+- 727dc2bd: fix: add caller settings to loadBabelOptions()
+- 25ba1344: `useBabelConfigs` feature flag.
+- 5f216d3b: `pluginOptions` could be lost during processing.
+- Updated dependencies [5f216d3b]
+- Updated dependencies [1e889937]
+- Updated dependencies [4992c14d]
+- Updated dependencies [15fa87a5]
+- Updated dependencies [1e889937]
+- Updated dependencies [25ba1344]
+- Updated dependencies [5f216d3b]
+  - @linaria/babel-preset@5.0.3
+  - @linaria/react@5.0.2
+  - @linaria/shaker@5.0.2
+  - @linaria/tags@5.0.2
+
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies [38796a57]
+  - @linaria/babel-preset@5.0.2
+
+## 5.0.1
+
+### Patch Changes
+
+- Updated dependencies [6fb6eb69]
+- Updated dependencies [6fb6eb69]
+  - @linaria/babel-preset@5.0.1
+  - @linaria/shaker@5.0.1
+  - @linaria/react@5.0.1
+  - @linaria/tags@5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- 88e07613: Rewritten dependecny tree processing with support for wildcard re-exports.
+- cb853e14: All processing stages were merged into one generators-based processor. It allows the implementation of more complex workflows to support features like dynamic imports and re-exports.
+
+### Minor Changes
+
+- 9cb4143d: Refactoring of the 1st stage of transformation. It opens the road to processing wildcard reexports.
+- ae162f46: babelrc should not be used for preeval transformations (fixes #1308)
+
+### Patch Changes
+
+- 715dc93c: feat: support dynamic imports for evaluation
+- b3ef8c1f: fix: add support for params in dynamic imports
+- f8b9bff5: Improved exports finder so it works with pure TS files and better detects transpiled reexports.
+- 63902332: The exports finder didn't support enums that were transpiled to esm by tsc. Fixed.
+- 8a5d734b: Add support for `import` and `require` calls with dynamic arguments.
+- aa100453: In some cases, an asynchronous resolver could cause race conditions. Fixed.
+- ea1444f6: feat: use happy-dom in module
+- 9bb782d0: The improved cache that fixes race conditions which lead to "The expression evaluated to 'undefined'" (fixes #1304 and #1287)
+- 2a1e24a0: Upgrade TypeScript to 5.2
+- Updated dependencies [9cb4143d]
+- Updated dependencies [ae162f46]
+- Updated dependencies [88e07613]
+- Updated dependencies [715dc93c]
+- Updated dependencies [b3ef8c1f]
+- Updated dependencies [144995f0]
+- Updated dependencies [f8b9bff5]
+- Updated dependencies [8a5d734b]
+- Updated dependencies [aa100453]
+- Updated dependencies [ea1444f6]
+- Updated dependencies [9bb782d0]
+- Updated dependencies [2a1e24a0]
+- Updated dependencies [cb853e14]
+- Updated dependencies [e042f96d]
+  - @linaria/babel-preset@5.0.0
+  - @linaria/extractor@5.0.0
+  - @linaria/react@5.0.0
+  - @linaria/shaker@5.0.0
+  - @linaria/tags@5.0.0
+
 ## 4.5.4
 
 ### Patch Changes

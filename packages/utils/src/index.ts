@@ -16,12 +16,18 @@ export {
   extractExpression,
 } from './collectTemplateDependencies';
 export { createId } from './createId';
+export { createFileReporter } from './debug/fileReporter';
 export { createPerfMeter } from './debug/perfMetter';
-export { EventEmitter } from './EventEmitter';
+export {
+  EventEmitter,
+  OnActionFinishArgs,
+  OnActionStartArgs,
+} from './EventEmitter';
 export { default as findIdentifiers, nonType } from './findIdentifiers';
 export { findPackageJSON } from './findPackageJSON';
 export { hasEvaluatorMetadata } from './hasEvaluatorMetadata';
 export { default as getFileIdx } from './getFileIdx';
+export { getPluginKey } from './getPluginKey';
 export { hasMeta } from './hasMeta';
 export { getSource } from './getSource';
 export { isBoxedPrimitive } from './isBoxedPrimitive';
@@ -31,7 +37,7 @@ export { default as isRemoved } from './isRemoved';
 export { default as isRequire } from './isRequire';
 export { isSerializable } from './isSerializable';
 export { default as isTypedNode } from './isTypedNode';
-export { default as isUnnecessaryReactCall } from './isUnnecessaryReactCall';
+export { isUnnecessaryReactCall } from './isUnnecessaryReactCall';
 export * from './options';
 export { removeDangerousCode } from './removeDangerousCode';
 export {
@@ -44,18 +50,25 @@ export {
   referenceAll,
 } from './scopeHelpers';
 export { default as slugify } from './slugify';
+export {
+  clearBabelTraversalCache,
+  invalidateTraversalCache,
+  getTraversalCache,
+} from './traversalCache';
 export { ValueType } from './types';
 export { valueToLiteral } from './valueToLiteral';
 export { default as JSXElementsRemover } from './visitors/JSXElementsRemover';
 
 export type {
-  IExport,
+  Exports,
   IImport,
   IReexport,
   ISideEffectImport,
   IState,
 } from './collectExportsAndImports';
+export type { IFileReporterOptions } from './debug/fileReporter';
 export type { IPerfMeterOptions } from './debug/perfMetter';
+export type { OnEvent } from './EventEmitter';
 export type { IVariableContext } from './IVariableContext';
 export type {
   Artifact,

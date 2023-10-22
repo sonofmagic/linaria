@@ -1,5 +1,83 @@
 # Change Log
 
+## 5.0.3
+
+### Patch Changes
+
+- 5f216d3b: Fix for lost `pluginOptions` in some entrypoints.
+- 15fa87a5: Fix an ENOENT error for built-in modules. Fixes #1353.
+- 25ba1344: `useBabelConfigs` feature flag.
+- 5f216d3b: `pluginOptions` could be lost during processing.
+- Updated dependencies [4992c14d]
+- Updated dependencies [70000ec8]
+- Updated dependencies [1e889937]
+- Updated dependencies [5a32f4fd]
+- Updated dependencies [727dc2bd]
+- Updated dependencies [25ba1344]
+- Updated dependencies [5a32f4fd]
+  - @linaria/shaker@5.0.2
+  - @linaria/utils@5.0.2
+  - @linaria/tags@5.0.2
+  - @linaria/core@5.0.2
+
+## 5.0.2
+
+### Patch Changes
+
+- 38796a57: For some reason, happy-dom setups context with undefined values when it is run on Stackblitz. Fixed with the workaround. (fixes #1345)
+
+## 5.0.1
+
+### Patch Changes
+
+- 6fb6eb69: The new option, 'overrideContext,' allows the extension of the module evaluation context.
+- Updated dependencies [6fb6eb69]
+  - @linaria/shaker@5.0.1
+  - @linaria/utils@5.0.1
+  - @linaria/core@5.0.1
+  - @linaria/tags@5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- 88e07613: Rewritten dependecny tree processing with support for wildcard re-exports.
+- cb853e14: All processing stages were merged into one generators-based processor. It allows the implementation of more complex workflows to support features like dynamic imports and re-exports.
+
+### Minor Changes
+
+- 9cb4143d: Refactoring of the 1st stage of transformation. It opens the road to processing wildcard reexports.
+- ae162f46: babelrc should not be used for preeval transformations (fixes #1308)
+
+### Patch Changes
+
+- 715dc93c: feat: support dynamic imports for evaluation
+- b3ef8c1f: fix: add support for params in dynamic imports
+- 144995f0: The new option, 'overrideContext,' allows the extension of the module evaluation context.
+- f8b9bff5: Improved exports finder so it works with pure TS files and better detects transpiled reexports.
+- 8a5d734b: Add support for `import` and `require` calls with dynamic arguments.
+- aa100453: In some cases, an asynchronous resolver could cause race conditions. Fixed.
+- ea1444f6: feat: use happy-dom in module
+- 9bb782d0: The improved cache that fixes race conditions which lead to "The expression evaluated to 'undefined'" (fixes #1304 and #1287)
+- 2a1e24a0: Upgrade TypeScript to 5.2
+- e042f96d: Optimized memory consumption.
+- Updated dependencies [9cb4143d]
+- Updated dependencies [ae162f46]
+- Updated dependencies [88e07613]
+- Updated dependencies [b3ef8c1f]
+- Updated dependencies [f8b9bff5]
+- Updated dependencies [63902332]
+- Updated dependencies [aa100453]
+- Updated dependencies [9bb782d0]
+- Updated dependencies [2a1e24a0]
+- Updated dependencies [16320d71]
+- Updated dependencies [cb853e14]
+  - @linaria/core@5.0.0
+  - @linaria/logger@5.0.0
+  - @linaria/shaker@5.0.0
+  - @linaria/tags@5.0.0
+  - @linaria/utils@5.0.0
+
 ## 4.5.4
 
 ### Patch Changes

@@ -2,30 +2,25 @@
  * This file is an entry point for module evaluation for getting lazy dependencies.
  */
 
-import type { StrictOptions } from '@linaria/utils';
-
-import type { TransformCacheCollection } from '../cache';
 import Module from '../module';
+import type { Entrypoint } from '../transform/Entrypoint';
+import type { Services } from '../transform/types';
+
+export interface IEvaluateResult {
+  dependencies: string[];
+  value: Record<string | symbol, unknown>;
+}
 
 export default function evaluate(
-  cache: TransformCacheCollection,
-  code: string,
-  pluginOptions: StrictOptions,
-  filename: string
-) {
-  const m = new Module(
-    filename ?? 'unknown',
-    '__linariaPreval',
-    pluginOptions,
-    cache
-  );
+  services: Services,
+  entrypoint: Entrypoint
+): IEvaluateResult {
+  const m = new Module(services, entrypoint);
 
-  m.dependencies = [];
-  m.evaluate(code);
+  m.evaluate();
 
   return {
-    value: m.exports,
+    value: entrypoint.exports,
     dependencies: m.dependencies,
-    processors: m.tagProcessors,
   };
 }

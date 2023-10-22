@@ -22,6 +22,7 @@ import {
   extractExpression,
   findPackageJSON,
   getSource,
+  getTraversalCache,
   isNotNull,
   mutate,
 } from '@linaria/utils';
@@ -32,7 +33,7 @@ type BuilderArgs = ConstructorParameters<typeof BaseProcessor> extends [
   typeof t,
   SourceLocation | null,
   (replacement: Expression, isPure: boolean) => void,
-  ...infer T
+  ...infer T,
 ]
   ? T
   : never;
@@ -189,7 +190,7 @@ function getProcessorForIdentifier(
         ([{ imported, source }, p]): [
           ProcessorClass | null,
           TagSource,
-          NodePath<Identifier | MemberExpression> | null
+          NodePath<Identifier | MemberExpression> | null,
         ] => {
           const customFile = tagResolver(source, imported);
           const processor = customFile
@@ -427,9 +428,7 @@ const getNextIndex = (state: IFileContext) => {
   return counter;
 };
 
-const cache = new WeakMap<Identifier, BaseProcessor | null>();
-
-export default function getTagProcessor(
+export function getTagProcessor(
   path: NodePath<Identifier>,
   fileContext: IFileContext,
   options: Pick<
@@ -437,6 +436,11 @@ export default function getTagProcessor(
     'classNameSlug' | 'displayName' | 'evaluate' | 'tagResolver'
   >
 ): BaseProcessor | null {
+  const cache = getTraversalCache<BaseProcessor | null, Identifier>(
+    path,
+    'getTagProcessor'
+  );
+
   if (!cache.has(path.node)) {
     const root = path.scope.getProgramParent().path as NodePath<Program>;
     const { imports } = collectExportsAndImports(root);

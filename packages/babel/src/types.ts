@@ -1,12 +1,16 @@
-import type { BabelFile, BabelFileMetadata, PluginPass } from '@babel/core';
+import type { BabelFile, PluginPass } from '@babel/core';
 import type { NodePath } from '@babel/traverse';
-import type { File } from '@babel/types';
+import type { File, Program } from '@babel/types';
 import type { RawSourceMap } from 'source-map';
 
+import type { Debugger } from '@linaria/logger';
 import type { BaseProcessor } from '@linaria/tags';
-import type { LinariaMetadata, Replacement, Rules } from '@linaria/utils';
-
-import type { PluginOptions } from './transform-stages/helpers/loadLinariaOptions';
+import type {
+  LinariaMetadata,
+  Replacement,
+  Rules,
+  StrictOptions,
+} from '@linaria/utils';
 
 export type { Value, ValueCache } from '@linaria/tags';
 
@@ -22,33 +26,46 @@ export type {
 
 export { ValueType } from '@linaria/utils';
 
+export type PluginOptions = StrictOptions & {
+  configFile?: string | false;
+  stage?: Stage;
+};
+
+export type ParentEntrypoint = {
+  evaluated: boolean;
+  log: Debugger;
+  name: string;
+  parents: ParentEntrypoint[];
+  seqId: number;
+};
+
 export type Dependencies = string[];
 
 export interface IPluginState extends PluginPass {
-  processors: BaseProcessor[];
   dependencies: Dependencies;
   file: BabelFile & {
     metadata: {
       linaria?: LinariaMetadata;
     };
   };
+  processors: BaseProcessor[];
 }
 
 export interface ITransformFileResult {
-  metadata?: BabelFileMetadata;
   code: string;
+  metadata: LinariaMetadata | null;
 }
 
 export type Stage = 'preeval' | 'collect';
 
 export type Result = {
   code: string;
-  sourceMap?: RawSourceMap | null;
-  cssText?: string;
   cssSourceMapText?: string;
+  cssText?: string;
   dependencies?: string[];
-  rules?: Rules;
   replacements?: Replacement[];
+  rules?: Rules;
+  sourceMap?: RawSourceMap | null;
 };
 
 export type Options = {
@@ -66,6 +83,6 @@ export type Preprocessor = 'none' | 'stylis' | PreprocessorFn | void;
 export type MissedBabelCoreTypes = {
   File: new (
     options: { filename: string },
-    file: { code: string; ast: File }
-  ) => { path: NodePath<File> };
+    file: { ast: File; code: string }
+  ) => { path: NodePath<Program> };
 };

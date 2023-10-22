@@ -4,13 +4,12 @@ import { join } from 'path';
 import * as babel from '@babel/core';
 
 import {
-  createEntrypoint,
+  Entrypoint,
   loadLinariaOptions,
   parseFile,
   prepareCode,
+  withDefaultServices,
 } from '@linaria/babel-preset';
-import { linariaLogger } from '@linaria/logger';
-import { EventEmitter } from '@linaria/utils';
 
 const testCasesDir = join(__dirname, '__fixtures__', 'prepare-code-test-cases');
 
@@ -58,20 +57,18 @@ describe('prepareCode', () => {
         .map((s) => s.trim());
 
       const sourceCode = restLines.join('\n');
-      const entrypoint = createEntrypoint(
+      const services = withDefaultServices({
         babel,
-        linariaLogger,
+        options: { root, filename: inputFilePath, pluginOptions },
+      });
+      const entrypoint = Entrypoint.createRoot(
+        services,
         inputFilePath,
         only,
-        sourceCode,
-        pluginOptions,
-        {
-          root,
-        },
-        EventEmitter.dummy
+        sourceCode
       );
 
-      if (entrypoint === 'ignored') {
+      if (entrypoint.ignored) {
         throw new Error('Ignored');
       }
       const ast = parseFile(babel, inputFilePath, sourceCode, {
@@ -79,11 +76,9 @@ describe('prepareCode', () => {
       });
 
       const [transformedCode, imports, metadata] = prepareCode(
-        babel,
+        services,
         entrypoint,
-        ast,
-        pluginOptions,
-        EventEmitter.dummy
+        ast
       );
 
       expect(transformedCode).toMatchSnapshot('code');

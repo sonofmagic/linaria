@@ -12,6 +12,7 @@ import {
   addIdentifierToLinariaPreval,
   removeDangerousCode,
   isFeatureEnabled,
+  invalidateTraversalCache,
 } from '@linaria/utils';
 
 import type { Core } from '../babel';
@@ -22,8 +23,6 @@ export type PreevalOptions = Pick<
   StrictOptions,
   'classNameSlug' | 'displayName' | 'evaluate' | 'features'
 > & { eventEmitter: EventEmitter };
-
-const onFinishCallbacks = new WeakMap<object, () => void>();
 
 export default function preeval(
   babel: Core,
@@ -41,48 +40,37 @@ export default function preeval(
       const rootScope = file.scope;
       this.processors = [];
 
-      const onProcessTemplateFinished = eventEmitter.pair({
-        method: 'preeval:processTemplate',
-      });
+      eventEmitter.perf('transform:preeval:processTemplate', () => {
+        file.path.traverse({
+          Identifier: (p) => {
+            processTemplateExpression(p, file.opts, options, (processor) => {
+              processor.dependencies.forEach((dependency) => {
+                if (dependency.ex.type === 'Identifier') {
+                  addIdentifierToLinariaPreval(rootScope, dependency.ex.name);
+                }
+              });
 
-      file.path.traverse({
-        Identifier: (p) => {
-          processTemplateExpression(p, file.opts, options, (processor) => {
-            processor.dependencies.forEach((dependency) => {
-              if (dependency.ex.type === 'Identifier') {
-                addIdentifierToLinariaPreval(rootScope, dependency.ex.name);
-              }
+              processor.doEvaltimeReplacement();
+              this.processors.push(processor);
             });
-
-            processor.doEvaltimeReplacement();
-            this.processors.push(processor);
-          });
-        },
+          },
+        });
       });
-
-      onProcessTemplateFinished();
 
       if (
         isFeatureEnabled(options.features, 'dangerousCodeRemover', filename)
       ) {
         log('start', 'Strip all JSX and browser related stuff');
-        const onCodeRemovingFinished = eventEmitter.pair({
-          method: 'preeval:removeDangerousCode',
-        });
-        removeDangerousCode(file.path);
-        onCodeRemovingFinished();
+        eventEmitter.perf('transform:preeval:removeDangerousCode', () =>
+          removeDangerousCode(file.path)
+        );
       }
-
-      onFinishCallbacks.set(
-        this,
-        eventEmitter.pair({ method: 'preeval:rest-transformations' })
-      );
     },
     visitor: {},
     post(file: BabelFile) {
-      onFinishCallbacks.get(this)?.();
-
       const log = createCustomDebug('preeval', getFileIdx(file.opts.filename!));
+
+      invalidateTraversalCache(file.path);
 
       if (this.processors.length === 0) {
         log('end', "We didn't find any Linaria template literals");

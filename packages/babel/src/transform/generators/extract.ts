@@ -4,9 +4,10 @@ import type { Mapping } from 'source-map';
 import { SourceMapGenerator } from 'source-map';
 import stylis from 'stylis';
 
-import type { Artifact, Replacements, Rules } from '@linaria/utils';
+import type { Replacements, Rules } from '@linaria/utils';
 
-import type { Options, PreprocessorFn } from '../types';
+import type { Options, PreprocessorFn } from '../../types';
+import type { IExtractAction, SyncScenarioForAction } from '../types';
 
 const STYLIS_DECLARATION = 1;
 const posixSep = path.posix.sep;
@@ -35,7 +36,7 @@ function extractCssFromAst(
   rules: Rules,
   originalCode: string,
   options: Pick<Options, 'preprocessor' | 'filename' | 'outputFilename'>
-) {
+): { cssSourceMapText: string; cssText: string; rules: Rules } {
   const mappings: Mapping[] = [];
 
   let cssText = '';
@@ -117,11 +118,18 @@ function extractCssFromAst(
 /**
  * Extract artifacts (e.g. CSS) from processors
  */
-export default function extractStage(
-  processors: { artifacts: Artifact[] }[],
-  originalCode: string,
-  options: Pick<Options, 'preprocessor' | 'filename' | 'outputFilename'>
-) {
+// eslint-disable-next-line require-yield
+export function* extract(
+  this: IExtractAction
+): SyncScenarioForAction<IExtractAction> {
+  const { options } = this.services;
+  const { entrypoint } = this;
+  const { processors } = this.data;
+  const { loadedAndParsed } = entrypoint;
+  if (loadedAndParsed.evaluator === 'ignored') {
+    throw new Error('entrypoint was ignored');
+  }
+
   let allRules: Rules = {};
   const allReplacements: Replacements = [];
   processors.forEach((processor) => {
@@ -129,7 +137,7 @@ export default function extractStage(
       if (artifact[0] !== 'css') return;
       const [rules, replacements] = artifact[1] as [
         rules: Rules,
-        sourceMapReplacements: Replacements
+        sourceMapReplacements: Replacements,
       ];
 
       allRules = {
@@ -142,7 +150,7 @@ export default function extractStage(
   });
 
   return {
-    ...extractCssFromAst(allRules, originalCode, options),
+    ...extractCssFromAst(allRules, loadedAndParsed.code, options),
     replacements: allReplacements,
   };
 }

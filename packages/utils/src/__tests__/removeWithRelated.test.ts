@@ -4,10 +4,17 @@ import { join } from 'path';
 import * as babel from '@babel/core';
 import type { NodePath } from '@babel/core';
 import generator from '@babel/generator';
+import type { File as FileNode } from '@babel/types';
 import dedent from 'dedent';
 
-import type { MissedBabelCoreTypes } from '@linaria/babel-preset';
-import { removeWithRelated } from '@linaria/utils';
+import { removeWithRelated } from '../scopeHelpers';
+
+type MissedBabelCoreTypes = {
+  File: new (
+    options: { filename: string },
+    file: { ast: FileNode; code: string }
+  ) => { path: NodePath<FileNode> };
+};
 
 const { File } = babel as typeof babel & MissedBabelCoreTypes;
 
@@ -91,7 +98,7 @@ describe('removeWithRelated', () => {
     expect(code).toMatchSnapshot();
   });
 
-  it('should keep logical expression', () => {
+  it('should optimize logical expression', () => {
     const code = run`
       const a = 1;
       /* remove */const b = 2;
@@ -177,6 +184,22 @@ describe('removeWithRelated', () => {
       export default function testDefaultFn(arg) {
         /* remove */console.log(arg);
       }
+    `;
+
+    expect(code).toMatchSnapshot();
+  });
+
+  it('should not remove functions that are assigned to prototype', () => {
+    const code = run`
+      (function() {
+        function SomeClass() {}
+
+        SomeClass.prototype.foo = function foo() {}
+
+        SomeClass.prototype.bar = function bar() {
+          /* remove */console.log(arg);
+        };
+      })();
     `;
 
     expect(code).toMatchSnapshot();

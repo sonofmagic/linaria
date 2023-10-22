@@ -1,6 +1,6 @@
 {
   "name": "linaria-website",
-  "version": "4.5.4",
+  "version": "5.0.3",
   "private": true,
   "description": "Linaria website",
   "exports": {
@@ -22,13 +22,13 @@
     "start": "webpack serve"
   },
   "dependencies": {
-    "@babel/runtime": "^7.22.6",
+    "@babel/runtime": "^7.22.15",
     "@linaria/atomic": "workspace:^",
     "@linaria/core": "workspace:^",
     "@linaria/react": "workspace:^",
     "@linaria/server": "workspace:^",
     "babel-plugin-file-loader": "^1.1.1",
-    "dedent": "^0.7.0",
+    "dedent": "^1.5.1",
     "escape-html": "^1.0.3",
     "ignore-styles": "^5.0.1",
     "koa": "^2.7.0",
@@ -39,8 +39,8 @@
     "react-dom": "^16.14.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.22.9",
-    "@babel/core": "^7.22.9",
+    "@babel/cli": "^7.22.15",
+    "@babel/core": "^7.22.15",
     "@linaria/babel-preset": "workspace:^",
     "@linaria/shaker": "workspace:^",
     "@linaria/stylelint": "workspace:^",
@@ -56,7 +56,7 @@
     "stylelint": "^14.11.0",
     "stylelint-config-recommended": "^3.0.0",
     "url": "^0.11.0",
-    "webpack": "^5.6.0",
+    "webpack": "^5.76.0",
     "webpack-cli": "^4.9.2",
     "webpack-dev-server": "^4.9.1"
   }

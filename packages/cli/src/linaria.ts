@@ -12,7 +12,7 @@ import normalize from 'normalize-path';
 import yargs from 'yargs';
 
 import { TransformCacheCollection, transform } from '@linaria/babel-preset';
-import { asyncResolveFallback, createPerfMeter } from '@linaria/utils';
+import { asyncResolveFallback, createFileReporter } from '@linaria/utils';
 
 const modulesOptions = [
   'commonjs',
@@ -43,6 +43,12 @@ const argv = yargs
     alias: 's',
     type: 'boolean',
     description: 'Generate source maps for the CSS files',
+    default: false,
+  })
+  .option('parallel', {
+    alias: 'p',
+    type: 'boolean',
+    description: 'Run extraction in parallel',
     default: false,
   })
   .option('source-root', {
@@ -89,8 +95,9 @@ type Options = {
   configFile?: string;
   ignore?: string;
   insertCssRequires?: string;
-  modules: typeof modulesOptions[number];
+  modules: (typeof modulesOptions)[number];
   outDir: string;
+  parallel?: boolean;
   sourceMaps?: boolean;
   sourceRoot: string;
   transform?: boolean;
@@ -114,9 +121,7 @@ function resolveOutputFilename(
 }
 
 async function processFiles(files: (number | string)[], options: Options) {
-  const { emitter, onDone } = createPerfMeter();
-
-  let count = 0;
+  const { emitter, onDone } = createFileReporter();
 
   const resolvedFiles = files.reduce(
     (acc, pattern) => [
@@ -130,7 +135,9 @@ async function processFiles(files: (number | string)[], options: Options) {
   );
   const cache = new TransformCacheCollection();
 
-  const modifiedFiles: { name: string; content: string }[] = [];
+  const modifiedFiles: { content: string; name: string }[] = [];
+
+  const tasks: (() => Promise<boolean>)[] = [];
 
   // eslint-disable-next-line no-restricted-syntax
   for (const filename of resolvedFiles) {
@@ -144,10 +151,8 @@ async function processFiles(files: (number | string)[], options: Options) {
       options.sourceRoot
     );
 
-    // eslint-disable-next-line no-await-in-loop
-    const { code, cssText, sourceMap, cssSourceMapText } = await transform(
-      fs.readFileSync(filename).toString(),
-      {
+    const transformServices = {
+      options: {
         filename,
         outputFilename,
         pluginOptions: {
@@ -155,73 +160,101 @@ async function processFiles(files: (number | string)[], options: Options) {
         },
         root: options.sourceRoot,
       },
-      asyncResolveFallback,
-      {},
       cache,
-      emitter
-    );
+      eventEmitter: emitter,
+    };
 
-    if (cssText) {
-      mkdirp.sync(path.dirname(outputFilename));
-
-      const cssContent =
-        options.sourceMaps && sourceMap
-          ? `${cssText}\n/*# sourceMappingURL=${outputFilename}.map */`
-          : cssText;
-
-      fs.writeFileSync(outputFilename, cssContent);
-
-      if (
-        options.sourceMaps &&
-        sourceMap &&
-        typeof cssSourceMapText !== 'undefined'
-      ) {
-        fs.writeFileSync(`${outputFilename}.map`, cssSourceMapText);
-      }
-
-      if (options.sourceRoot && options.insertCssRequires) {
-        const inputFilename = path.resolve(
-          options.insertCssRequires,
-          path.relative(options.sourceRoot, filename)
-        );
-
-        const relativePath = normalize(
-          path.relative(path.dirname(inputFilename), outputFilename)
-        );
-
-        const pathForImport = relativePath.startsWith('.')
-          ? relativePath
-          : `./${relativePath}`;
-
-        const statement =
-          options.modules === 'commonjs'
-            ? `\nrequire('${pathForImport}');`
-            : `\nimport "${pathForImport}";`;
-
-        const normalizedInputFilename =
-          resolveRequireInsertionFilename(inputFilename);
-
-        const inputContent = options.transform
-          ? code
-          : fs.readFileSync(normalizedInputFilename, 'utf-8');
-
-        if (!inputContent.trim().endsWith(statement)) {
-          modifiedFiles.push({
-            name: normalizedInputFilename,
-            content: `${inputContent}\n${statement}\n`,
-          });
+    tasks.push(() =>
+      transform(
+        transformServices,
+        fs.readFileSync(filename).toString(),
+        asyncResolveFallback
+      ).then(({ code, cssText, sourceMap, cssSourceMapText }): boolean => {
+        if (!cssText) {
+          return false;
         }
-      }
+        mkdirp.sync(path.dirname(outputFilename));
 
-      count += 1;
+        const cssContent =
+          options.sourceMaps && sourceMap
+            ? `${cssText}\n/*# sourceMappingURL=${outputFilename}.map */`
+            : cssText;
+
+        fs.writeFileSync(outputFilename, cssContent);
+
+        if (
+          options.sourceMaps &&
+          sourceMap &&
+          typeof cssSourceMapText !== 'undefined'
+        ) {
+          fs.writeFileSync(`${outputFilename}.map`, cssSourceMapText);
+        }
+
+        if (options.sourceRoot && options.insertCssRequires) {
+          const inputFilename = path.resolve(
+            options.insertCssRequires,
+            path.relative(options.sourceRoot, filename)
+          );
+
+          const relativePath = normalize(
+            path.relative(path.dirname(inputFilename), outputFilename)
+          );
+
+          const pathForImport = relativePath.startsWith('.')
+            ? relativePath
+            : `./${relativePath}`;
+
+          const statement =
+            options.modules === 'commonjs'
+              ? `\nrequire('${pathForImport}');`
+              : `\nimport "${pathForImport}";`;
+
+          const normalizedInputFilename =
+            resolveRequireInsertionFilename(inputFilename);
+
+          const inputContent = options.transform
+            ? code
+            : fs.readFileSync(normalizedInputFilename, 'utf-8');
+
+          if (!inputContent.trim().endsWith(statement)) {
+            modifiedFiles.push({
+              name: normalizedInputFilename,
+              content: `${inputContent}\n${statement}\n`,
+            });
+          }
+        }
+
+        return true;
+      })
+    );
+  }
+
+  if (options.parallel) {
+    const res = await Promise.all(tasks.map((task) => task()));
+    console.log(
+      `Successfully extracted ${res.filter((i) => i).length} CSS files.`
+    );
+  } else {
+    let count = 0;
+    for (const task of tasks) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await task();
+      if (res) {
+        count += 1;
+      }
     }
+
+    console.log(`Successfully extracted ${count} CSS files.`);
   }
 
   modifiedFiles.forEach(({ name, content }) => {
     fs.writeFileSync(name, content);
   });
 
-  console.log(`Successfully extracted ${count} CSS files.`);
+  cache.clear('all');
+  modifiedFiles.length = 0;
+  resolvedFiles.length = 0;
+  tasks.length = 0;
 
   onDone(options.sourceRoot ?? process.cwd());
 }
@@ -231,6 +264,7 @@ processFiles(argv._, {
   ignore: argv.ignore,
   insertCssRequires: argv['insert-css-requires'],
   modules: argv.modules,
+  parallel: argv.parallel,
   outDir: argv['out-dir'],
   sourceMaps: argv['source-maps'],
   sourceRoot: argv['source-root'],

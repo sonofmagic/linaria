@@ -28,7 +28,7 @@ export type Serializable = JSONValue;
 
 export type BuildCodeFrameErrorFn = <TError extends Error>(
   msg: string,
-  Error?: new (msg: string) => TError
+  Error?: new (innerMsg: string) => TError
 ) => TError;
 
 export enum ValueType {
@@ -77,31 +77,30 @@ export type StyledMeta = {
 };
 
 export type Location = {
-  line: number;
   column: number;
+  line: number;
 };
 
 export interface ICSSRule {
-  className: string;
-  displayName: string;
-  cssText: string;
-  start: Location | null | undefined;
   atom?: boolean;
+  className: string;
+  cssText: string;
+  displayName: string;
+  start: Location | null | undefined;
 }
 
 export type Rules = Record<string, ICSSRule>;
 
 export type LinariaMetadata = {
-  processors: { artifacts: Artifact[] }[];
-
-  rules: Rules;
-  replacements: Replacement[];
   dependencies: string[];
+  processors: { artifacts: Artifact[] }[];
+  replacements: Replacement[];
+  rules: Rules;
 };
 
 export type Replacement = {
-  original: { start: Location; end: Location };
   length: number;
+  original: { end: Location; start: Location };
 };
 
 export type Replacements = Array<Replacement>;

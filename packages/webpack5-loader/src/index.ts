@@ -22,13 +22,12 @@ export { LinariaDebugPlugin } from './LinariaDebugPlugin';
 const outputCssLoader = require.resolve('./outputCssLoader');
 
 type Loader = RawLoaderDefinitionFunction<{
-  sourceMap?: boolean;
-  preprocessor?: Preprocessor;
-  extension?: string;
   cacheProvider?: string | ICache;
+  extension?: string;
+  preprocessor?: Preprocessor;
+  sourceMap?: boolean;
 }>;
 
-const emptyConfig = {};
 const cache = new TransformCacheCollection();
 
 const webpack5Loader: Loader = function webpack5LoaderPlugin(
@@ -67,13 +66,14 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
   } = this.getOptions() || {};
 
   const outputFileName = this.resourcePath.replace(/\.[^.]+$/, extension);
+  const resolveModule = this.getResolve({ dependencyType: 'esm' });
 
   const asyncResolve = (token: string, importer: string): Promise<string> => {
     const context = path.isAbsolute(importer)
       ? path.dirname(importer)
       : path.join(process.cwd(), path.dirname(importer));
     return new Promise((resolve, reject) => {
-      this.resolve(context, token, (err, result) => {
+      resolveModule(context, token, (err, result) => {
         if (err) {
           reject(err);
         } else if (result) {
@@ -86,68 +86,70 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
     });
   };
 
-  transform(
-    content.toString(),
-    {
+  const transformServices = {
+    options: {
       filename: this.resourcePath,
       inputSourceMap: convertSourceMap(inputSourceMap, this.resourcePath),
-      pluginOptions: rest,
+      root: process.cwd(),
       preprocessor,
+      pluginOptions: rest,
     },
-    asyncResolve,
-    emptyConfig,
     cache,
-    sharedState.emitter
-  ).then(
-    async (result: Result) => {
-      if (result.cssText) {
-        let { cssText } = result;
+    eventEmitter: sharedState.emitter,
+  };
 
-        if (sourceMap) {
-          cssText += `/*# sourceMappingURL=data:application/json;base64,${Buffer.from(
-            result.cssSourceMapText || ''
-          ).toString('base64')}*/`;
+  transform(transformServices, content.toString(), asyncResolve)
+    .then(
+      async (result: Result) => {
+        if (result.cssText) {
+          let { cssText } = result;
+
+          if (sourceMap) {
+            cssText += `/*# sourceMappingURL=data:application/json;base64,${Buffer.from(
+              result.cssSourceMapText || ''
+            ).toString('base64')}*/`;
+          }
+
+          await Promise.all(
+            result.dependencies?.map((dep) =>
+              asyncResolve(dep, this.resourcePath)
+            ) ?? []
+          );
+
+          try {
+            const cacheInstance = await getCacheInstance(cacheProvider);
+
+            await cacheInstance.set(this.resourcePath, cssText);
+
+            await cacheInstance.setDependencies?.(
+              this.resourcePath,
+              this.getDependencies()
+            );
+
+            const request = `${outputFileName}!=!${outputCssLoader}?cacheProvider=${encodeURIComponent(
+              typeof cacheProvider === 'string' ? cacheProvider : ''
+            )}!${this.resourcePath}`;
+            const stringifiedRequest = JSON.stringify(
+              this.utils.contextify(this.context || this.rootContext, request)
+            );
+
+            this.callback(
+              null,
+              `${result.code}\n\nrequire(${stringifiedRequest});`,
+              result.sourceMap ?? undefined
+            );
+          } catch (err) {
+            this.callback(err as Error);
+          }
+
+          return;
         }
 
-        await Promise.all(
-          result.dependencies?.map((dep) =>
-            asyncResolve(dep, this.resourcePath)
-          ) ?? []
-        );
-
-        try {
-          const cacheInstance = await getCacheInstance(cacheProvider);
-
-          await cacheInstance.set(this.resourcePath, cssText);
-
-          await cacheInstance.setDependencies?.(
-            this.resourcePath,
-            this.getDependencies()
-          );
-
-          const request = `${outputFileName}!=!${outputCssLoader}?cacheProvider=${encodeURIComponent(
-            typeof cacheProvider === 'string' ? cacheProvider : ''
-          )}!${this.resourcePath}`;
-          const stringifiedRequest = JSON.stringify(
-            this.utils.contextify(this.context || this.rootContext, request)
-          );
-
-          this.callback(
-            null,
-            `${result.code}\n\nrequire(${stringifiedRequest});`,
-            result.sourceMap ?? undefined
-          );
-        } catch (err) {
-          this.callback(err as Error);
-        }
-
-        return;
-      }
-
-      this.callback(null, result.code, result.sourceMap ?? undefined);
-    },
-    (err: Error) => this.callback(err)
-  );
+        this.callback(null, result.code, result.sourceMap ?? undefined);
+      },
+      (err: Error) => this.callback(err)
+    )
+    .catch((err: Error) => this.callback(err));
 };
 
 export default webpack5Loader;
